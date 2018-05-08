@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+
+    <title>Nebulas bequest smart contract</title>
+    <link rel="stylesheet" href="index.css">
+
+    <link href="lib/datepicker.min.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+    <div class="contenner">
+        <div class="logo">
+            <div class="img">
+                <img src="img/logo.png" alt="">
+            </div>
+            <div class="name">Create testament with schedule</div>
+        </div>
+        <div class="noExtension hide" id="noExtension">
+            NOTE: Please install <a target="_blank" href="https://github.com/ChengOrangeJu/WebExtensionWallet">WebExtensionWallet</a>  to use NameSend
+        </div>
+        <div class="menu">
+            <button class="active" id="create_menu">Create</button>
+            <button id="withdraw_menu">Withdraw</button>
+        </div>
+
+        <div class="app_form withdraw hide">
+            <input id="secret_for_withdraw" type="text" placeholder="secret word" disabled>
+            <button id="withdraw" disabled>withdraw</button>
+        </div>
+
+        <div class="app_form create">
+            <input data-position="right top" id="date" type="text" placeholder="date" disabled> <span id="blocks-count"></span><br/>
+            <input id="address" type="text" placeholder="address" disabled><br/>
+            <input id="secret" type="text" placeholder="secret word" disabled>
+            <button id="create" disabled>create</button>
+        </div>
+
+    </div>
+    <script src=lib/jquery-3.3.1.min.js></script>
+    <script src="lib/datepicker.min.js"></script>
+    <script src="lib/datepicker.en.js"></script>
+    <script src=lib/nebPay.js></script>
+    <script>
+    var NebPay = require("nebpay");
+    var nebPay = new NebPay();
+    var dappAddress = "n1mCtHprsXQERZHCbxZZJ4ZyHcxpFY2M1ov";
+    var blockIntervalSeconds = 15;
+    var minDate = new Date();
+    minDate.setDate(minDate.getDate()+1);
+
+    if(typeof(webExtensionWallet) === "undefined"){
+        //alert ("Extension wallet is not installed, please install it first.")
+        $("#noExtension").removeClass("hide")
+    }else{
+        $("#create").attr("disabled",false);
+        $("#address").attr("disabled",false);
+        $("#secret").attr("disabled",false);
+        $("#date").attr("disabled",false);
+        $("#withdraw").attr("disabled",false);
+        $("#secret_for_withdraw").attr("disabled",false);
+    }
+
+    var blocksRemain;
+    $('#date').datepicker({
+        language: 'en',
+        minDate: minDate,
+        onSelect: function onSelect(fd, date) {
+            var secondsDiff = (date.getTime()-new Date().getTime())/1000;
+            blocksRemain = Math.round(secondsDiff/blockIntervalSeconds);
+            console.log(blocksRemain);
+            $("#blocks-count").text("~" + blocksRemain + " blocks to withdraw");
+        }
+    });
+
+    $(".menu button").click(function(e){
+        $(".menu button.active").removeClass("active");
+        $(e.target).addClass("active");
+        $(".app_form").addClass("hide");
+    });
+
+    $("#create_menu").click(function(){
+        $(".app_form.create").removeClass("hide");
+    });
+
+    $("#withdraw_menu").click(function(){
+        $(".app_form.withdraw").removeClass("hide");
+    });
+
+    $("#create").click(function(){
+        var to = dappAddress;
+        var value = "0.05";
+        var callFunction = "create";
+        var callArgs = "[\"" + $("#secret").val() + "\",\"" + blocksRemain.toString() + "\",\"" + $("#address").val() + "\"]";
+        console.log(callArgs);
+        nebPay.simulateCall(to, value, callFunction, callArgs, {
+            listener: function(resp) {
+                var result = JSON.parse(resp.result);
+                console.log("CREATING: return of rpc call: " + JSON.stringify(result));
+                if(result.success){
+                    nebPay.call(to, value, callFunction, callArgs, {
+                        listener: function(resp) {
+                            var result = JSON.parse(resp.result);
+                            console.log("SENDING: return of rpc call: " + result);
+                        }
+                    });                    
+                } else {
+                    alert(result.message);
+                }
+            }
+        });
+
+    });
+
+    $("#withdraw").click(function(){
+        var to = dappAddress;
+        var value = "0";
+        var callFunction = "withdraw";
+        var callArgs = "[\"" + $("#secret_for_withdraw").val() + "\"]";
+        console.log(callArgs);
+        nebPay.simulateCall(to, value, callFunction, callArgs, {
+            listener: function(resp) {
+                var result = JSON.parse(resp.result);
+                console.log("WITHDRAWING: return of rpc call: " + result);
+                if(result.success){
+                    alert("There is "+ result.amount.toString() + " available for withdraw to " + result.beneficiary.toString());
+                    nebPay.call(to, value, callFunction, callArgs, {});
+                } else {
+                    alert(result.message);
+                }
+            }
+        });
+
+    });
+
+</script>
+</body>
+
+</html>
